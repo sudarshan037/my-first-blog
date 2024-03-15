@@ -1,0 +1,53 @@
+trigger:
+  - master
+ 
+  pool:
+    vmImage: ubuntu-latest
+ 
+  steps:
+  - task: NodeTool@0
+    inputs:
+      versionSpec: '18.x'
+    displayName: 'Install Node.js'
+   
+  - script: |
+      npm install --legacy-peer-deps
+      npm run build
+    displayName: 'npm install and build'
+ 
+  - task: CopyFiles@2
+    inputs:
+      SourceFolder: '$(Build.SourcesDirectory)'
+      Contents: '**'
+      TargetFolder: '$(Build.ArtifactStagingDirectory)'
+ 
+  - task: ArchiveFiles@2
+    inputs:
+      rootFolderOrFile: '$(Build.ArtifactStagingDirectory)/build'
+      includeRootFolder: true
+      archiveType: 'zip'
+      archiveFile: '$(Build.ArtifactStagingDirectory)/$(Build.BuildId).zip'
+      replaceExistingArchive: true
+ 
+  - task: PublishBuildArtifacts@1
+    inputs:
+      PathtoPublish: '$(Build.ArtifactStagingDirectory)/$(Build.BuildId).zip'
+      ArtifactName: 'drop'
+      publishLocation: 'Container'
+ 
+  - task: ExtractFiles@1
+    inputs:
+      archiveFilePatterns: '$(Build.ArtifactStagingDirectory)/$(Build.BuildId).zip'
+      destinationFolder: '$(Build.ArtifactStagingDirectory)/$(Build.BuildId)'
+      cleanDestinationFolder: true
+      overwriteExistingFiles: false
+ 
+  - task: AzureRmWebAppDeployment@4
+    inputs:
+      ConnectionType: 'AzureRM'
+      azureSubscription: 'sub name'
+      appType: 'webAppLinux'
+      WebAppName: 'webapp-name'
+      packageForLinux: '$(Build.ArtifactStagingDirectory)/$(Build.BuildId)/build'
+      RuntimeStack: 'NODE|18-lts'
+      StartupCommand: 'pm2 serve /home/site/wwwroot --no-daemon'
